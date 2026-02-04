@@ -5,6 +5,7 @@ import { useAccount, useDisconnect, useSignMessage } from 'wagmi';
 import { type Hex } from 'viem';
 import { genCloakedMessage } from '@cloakedxyz/clkd-stealth';
 import { WalletSelectModal } from '~/components/WalletSelectModal';
+import { PostRecoveryGuide } from '~/components/PostRecoveryGuide';
 import { deriveStealthKeys, type DerivedKey } from '~/lib/deriveKeys';
 
 type Step = 'connect' | 'pin' | 'sign' | 'results';
@@ -208,6 +209,14 @@ export default function RecoveryPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleTryDifferentPin = () => {
+    setStep('pin');
+    setDerivedKeys([]);
+    setProgress(0);
+    setSignature(null);
+    setCurrentPage(0);
+  };
+
   const handleDisconnect = () => {
     disconnect();
   };
@@ -220,9 +229,35 @@ export default function RecoveryPage() {
     <main className="min-h-screen flex flex-col items-center px-4 py-8">
       {/* Header */}
       <div className="w-full max-w-2xl animate-drop-in">
-        <div className="flex items-center justify-center gap-3 mb-2">
-          <img src="/cloaked_logo.png" alt="Cloaked" className="w-10 h-10" />
-          <h1 className="text-2xl font-bold text-text-primary">Cloaked Recovery</h1>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <img src="/cloaked_logo.png" alt="Cloaked" className="w-10 h-10" />
+            <h1 className="text-2xl font-bold text-text-primary">Cloaked Recovery</h1>
+          </div>
+          {isConnected && address && (
+            <div className="flex items-center gap-3 animate-fade-in">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-status-green" />
+                <span className="text-sm text-text-primary font-medium">
+                  {address.slice(0, 6)}...{address.slice(-4)}
+                </span>
+              </div>
+              <button
+                onClick={handleDisconnect}
+                className="text-text-muted hover:text-red-500 transition-colors"
+                aria-label="Disconnect"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 16 16"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M8 7.3335C7.63133 7.3335 7.33333 7.03483 7.33333 6.66683V2.00016C7.33333 1.63216 7.63133 1.3335 8 1.3335C8.36867 1.3335 8.66667 1.63216 8.66667 2.00016V6.66683C8.66667 7.03483 8.36867 7.3335 8 7.3335ZM14 8.66683C14 6.5375 12.8506 4.5462 11.002 3.47087C10.6833 3.28553 10.2753 3.39343 10.0907 3.71143C9.90532 4.03009 10.0134 4.43822 10.3314 4.62288C11.772 5.46088 12.6667 7.01083 12.6667 8.66683C12.6667 11.2402 10.5727 13.3335 8 13.3335C5.42733 13.3335 3.33333 11.2402 3.33333 8.66683C3.33333 7.01083 4.22795 5.46088 5.66862 4.62288C5.98729 4.43822 6.09534 4.02943 5.90934 3.71143C5.72334 3.39343 5.31538 3.2842 4.99805 3.47087C3.14938 4.54687 2 6.5375 2 8.66683C2 11.9748 4.69133 14.6668 8 14.6668C11.3087 14.6668 14 11.9748 14 8.66683Z" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
         <p className="text-center text-text-muted text-sm mb-6">
           Recover your Cloaked stealth address private keys entirely client-side.
@@ -237,26 +272,6 @@ export default function RecoveryPage() {
           </p>
         </div>
       </div>
-
-      {/* Connected Address */}
-      {isConnected && address && (
-        <div className="w-full max-w-2xl mb-6 animate-fade-in">
-          <div className="flex items-center justify-between bg-card-raised rounded-lg px-4 py-3 border border-gray-200">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-status-green" />
-              <span className="text-sm text-text-primary font-medium">
-                {address.slice(0, 6)}...{address.slice(-4)}
-              </span>
-            </div>
-            <button
-              onClick={handleDisconnect}
-              className="text-sm text-text-muted hover:text-red-500 transition-colors"
-            >
-              Disconnect
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Step Content */}
       <div className="w-full max-w-2xl">
@@ -489,6 +504,11 @@ export default function RecoveryPage() {
                   </button>
                 </div>
               </div>
+            )}
+
+            {/* Post-recovery guidance */}
+            {derivedKeys.length > 0 && !deriving && (
+              <PostRecoveryGuide onTryDifferentPin={handleTryDifferentPin} />
             )}
 
             {/* Keys table */}
