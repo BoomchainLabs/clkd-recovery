@@ -143,9 +143,14 @@ export default function RecoveryPage() {
     }
   };
 
-  // Signature-based batch derivation (wallet+PIN flow)
-  const deriveKeysInBatches = useCallback(
-    async (signature: Hex, totalCount: number, startFrom: number = 0) => {
+  // Batch derivation — shared by both wallet+PIN and backup flows.
+  // Takes a deriveFn so callers choose which key source to use.
+  const deriveInBatches = useCallback(
+    async (
+      deriveFn: (startNonce: number, count: number) => DerivedKey[],
+      totalCount: number,
+      startFrom: number = 0
+    ) => {
       setDeriving(true);
       setProgress(0);
 
@@ -159,34 +164,7 @@ export default function RecoveryPage() {
         // Yield to UI between batches
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        const batchKeys = deriveStealthKeys(signature, batchStart, batchCount);
-        allKeys.push(...batchKeys);
-        setDerivedKeys([...allKeys]);
-        setProgress(Math.round(((i + 1) / batches) * 100));
-      }
-
-      setDeriving(false);
-    },
-    [derivedKeys]
-  );
-
-  // Raw-key batch derivation (backup flow)
-  const deriveKeysFromRawInBatches = useCallback(
-    async (pSpend: Hex, pView: Hex, totalCount: number, startFrom: number = 0) => {
-      setDeriving(true);
-      setProgress(0);
-
-      const allKeys: DerivedKey[] = startFrom > 0 ? [...derivedKeys] : [];
-      const batches = Math.ceil(totalCount / BATCH_SIZE);
-
-      for (let i = 0; i < batches; i++) {
-        const batchStart = startFrom + i * BATCH_SIZE;
-        const batchCount = Math.min(BATCH_SIZE, totalCount - i * BATCH_SIZE);
-
-        // Yield to UI between batches
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        const batchKeys = deriveStealthKeysFromRaw(pSpend, pView, batchStart, batchCount);
+        const batchKeys = deriveFn(batchStart, batchCount);
         allKeys.push(...batchKeys);
         setDerivedKeys([...allKeys]);
         setProgress(Math.round(((i + 1) / batches) * 100));
@@ -213,7 +191,7 @@ export default function RecoveryPage() {
       const sig = (await signMessageAsync({ message })) as Hex;
       setSignature(sig);
       setStep('results');
-      await deriveKeysInBatches(sig, INITIAL_COUNT);
+      await deriveInBatches((s, c) => deriveStealthKeys(sig, s, c), INITIAL_COUNT);
     } catch (err) {
       if (
         err instanceof Error &&
@@ -232,9 +210,15 @@ export default function RecoveryPage() {
   const handleDeriveMore = async () => {
     const nextStart = derivedKeys.length;
     if (recoveryMethod === 'backup' && rawKeys) {
-      await deriveKeysFromRawInBatches(rawKeys.pSpend, rawKeys.pView, INITIAL_COUNT, nextStart);
+      const { pSpend, pView } = rawKeys;
+      await deriveInBatches(
+        (s, c) => deriveStealthKeysFromRaw(pSpend, pView, s, c),
+        INITIAL_COUNT,
+        nextStart
+      );
     } else if (signature) {
-      await deriveKeysInBatches(signature, INITIAL_COUNT, nextStart);
+      const sig = signature;
+      await deriveInBatches((s, c) => deriveStealthKeys(sig, s, c), INITIAL_COUNT, nextStart);
     }
   };
 
@@ -264,7 +248,7 @@ export default function RecoveryPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleTryDifferentPin = () => {
+  const handleRetry = () => {
     if (recoveryMethod === 'backup') {
       // Reset backup flow
       setBackupFile(null);
@@ -337,7 +321,7 @@ export default function RecoveryPage() {
       const { pSpend, pView } = await decryptRecoveryKit(backupFile, backupPassword);
       setRawKeys({ pSpend, pView });
       setStep('results');
-      await deriveKeysFromRawInBatches(pSpend, pView, INITIAL_COUNT);
+      await deriveInBatches((s, c) => deriveStealthKeysFromRaw(pSpend, pView, s, c), INITIAL_COUNT);
     } catch (err) {
       // @noble/ciphers throws "tag doesn't match" on AES-GCM auth failure (wrong password).
       // Our own decryptBackup throws "malformed" if the decrypted payload has an unexpected shape.
@@ -920,7 +904,7 @@ export default function RecoveryPage() {
             {/* Post-recovery guidance */}
             {derivedKeys.length > 0 && !deriving && (
               <PostRecoveryGuide
-                onRetry={handleTryDifferentPin}
+                onRetry={handleRetry}
                 recoveryMethod={recoveryMethod ?? 'wallet'}
               />
             )}
