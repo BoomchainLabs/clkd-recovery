@@ -324,9 +324,7 @@ export default function RecoveryPage() {
       // Use nonce hint from backup to derive exactly the addresses the server created,
       // otherwise fall back to the default count
       const count =
-        backupFile.lastConsumedNonce != null
-          ? backupFile.lastConsumedNonce + 1
-          : INITIAL_COUNT;
+        backupFile.lastConsumedNonce != null ? backupFile.lastConsumedNonce + 1 : INITIAL_COUNT;
       await deriveInBatches((s, c) => deriveStealthKeysFromRaw(pSpend, pView, s, c), count);
     } catch (err) {
       // @noble/ciphers throws "tag doesn't match" on AES-GCM auth failure (wrong password).
