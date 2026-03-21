@@ -234,14 +234,14 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
           </div>
           <div className="w-32">
             <label className="text-xs text-text-muted mb-1 flex items-center gap-1">
-              Max deposits
+              Est. deposits
               <span className="relative group">
                 <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-gray-300 text-gray-400 text-[10px] cursor-help">
                   i
                 </span>
                 <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-52 px-2.5 py-1.5 text-[11px] text-white bg-gray-800 rounded-md shadow-lg z-10 leading-relaxed">
-                  How many deposit indices to check. Each deposit uses the next index (0, 1, 2,
-                  ...). Increase if you made more deposits than the default.
+                  Estimated number of Privacy Pool deposits you&apos;ve made. We&apos;ll check this
+                  many indices to find your deposits.
                 </span>
               </span>
             </label>
