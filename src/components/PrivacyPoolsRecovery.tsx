@@ -38,11 +38,14 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
   const [deposits, setDeposits] = useState<PoolDeposit[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(false);
+  const [customStartBlock, setCustomStartBlock] = useState('');
+  const [scanProgress, setScanProgress] = useState('');
 
   const scanForDeposits = useCallback(async () => {
     setScanning(true);
     setError(null);
     setDeposits([]);
+    setScanProgress('Connecting...');
 
     try {
       const config = getChainConfig(chainId);
@@ -62,12 +65,21 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
       const scope = scopeRes as bigint;
 
       const currentBlock = await client.getBlockNumber();
+      const startBlock = customStartBlock
+        ? BigInt(customStartBlock)
+        : config.startBlock;
+      const totalBlocks = currentBlock - startBlock;
+
+      setScanProgress(`Scanning ${totalBlocks.toLocaleString()} blocks...`);
+
       const { depositsByPrecommitment } = await scanPoolEvents(
         client as any,
         poolConfig.address as `0x${string}`,
-        config.startBlock,
+        startBlock,
         currentBlock
       );
+
+      setScanProgress('Checking deposit indices...');
 
       const found: PoolDeposit[] = [];
       let consecutiveMisses = 0;
@@ -205,6 +217,32 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
           {scanning ? 'Scanning...' : scanned ? 'Rescan' : 'Scan for Deposits'}
         </button>
       </div>
+
+      {/* Optional start block + progress */}
+      {!scanned && !scanning && (
+        <div className="mb-4">
+          <label className="text-xs text-text-muted block mb-1">
+            Start block (optional — speeds up scan if you know when you deposited)
+          </label>
+          <input
+            type="text"
+            value={customStartBlock}
+            onChange={(e) => setCustomStartBlock(e.target.value.replace(/\D/g, ''))}
+            placeholder={`Default: ${getChainConfig(chainId).startBlock.toString()}`}
+            className="w-full max-w-xs px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+          />
+        </div>
+      )}
+
+      {scanning && scanProgress && (
+        <div className="mb-4 flex items-center gap-2">
+          <svg className="animate-spin h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="text-sm text-text-muted">{scanProgress}</p>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
