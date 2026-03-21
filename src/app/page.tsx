@@ -6,6 +6,7 @@ import { type Hex } from 'viem';
 import { genCloakedMessage } from '@cloakedxyz/clkd-stealth';
 import { WalletSelectModal } from '~/components/WalletSelectModal';
 import { PostRecoveryGuide } from '~/components/PostRecoveryGuide';
+import { PrivacyPoolsRecovery } from '~/components/PrivacyPoolsRecovery';
 import { deriveStealthKeys, deriveStealthKeysFromRaw, type DerivedKey } from '~/lib/deriveKeys';
 import { decryptRecoveryKit, type RecoveryKitFile } from '~/lib/decryptBackup';
 
@@ -1072,6 +1073,18 @@ export default function RecoveryPage() {
                   </>
                 );
               })()}
+
+            {/* Privacy Pools Recovery — wallet flow only (needs signature for PP key derivation) */}
+            {recoveryMethod === 'wallet' && signature && !deriving && derivedKeys.length > 0 && (
+              <PrivacyPoolsRecovery
+                signature={signature}
+                chainId={
+                  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+                    ? 11155111
+                    : 1
+                }
+              />
+            )}
           </div>
         )}
       </div>

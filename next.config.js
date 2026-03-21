@@ -1,5 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // The 0xbow SDK conditionally imports Node.js modules for loading
+      // circuit artifacts. In the browser, we use URL-based loading instead.
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+      };
+    }
+    // Suppress pino-pretty warning from WalletConnect
+    config.externals = [...(config.externals || []), 'pino-pretty'];
+    return config;
+  },
   async headers() {
     return [
       {
