@@ -39,6 +39,7 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(false);
   const [customStartBlock, setCustomStartBlock] = useState('');
+  const [customEndBlock, setCustomEndBlock] = useState('');
   const [scanProgress, setScanProgress] = useState('');
   const [scanPercent, setScanPercent] = useState(0);
 
@@ -66,11 +67,14 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
       });
       const scope = scopeRes as bigint;
 
-      const currentBlock = await client.getBlockNumber();
+      const latestBlock = await client.getBlockNumber();
       const startBlock = customStartBlock
         ? BigInt(customStartBlock)
         : config.startBlock;
-      const totalBlocks = currentBlock - startBlock;
+      const endBlock = customEndBlock
+        ? BigInt(customEndBlock)
+        : latestBlock;
+      const totalBlocks = endBlock - startBlock;
 
       setScanProgress(`Scanning ${totalBlocks.toLocaleString()} blocks...`);
 
@@ -78,7 +82,7 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
         client as any,
         poolConfig.address as `0x${string}`,
         startBlock,
-        currentBlock,
+        endBlock,
         undefined,
         (scanned, total) => {
           if (total > BigInt(0)) {
@@ -140,7 +144,7 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
     } finally {
       setScanning(false);
     }
-  }, [signature, chainId, customStartBlock]);
+  }, [signature, chainId, customStartBlock, customEndBlock]);
 
   const totalValue = deposits.reduce((sum, d) => sum + d.deposit.value, BigInt(0));
 
@@ -200,49 +204,43 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
           </div>
         </div>
 
-        <button
-          onClick={scanForDeposits}
-          disabled={scanning}
-          className={`text-sm font-medium px-4 py-2 rounded-lg transition-all disabled:opacity-50 flex items-center gap-2 ${
-            scanned
-              ? 'text-primary hover:text-primary-light border border-primary/30 hover:border-primary'
-              : 'bg-primary hover:bg-primary-light text-white shadow-button'
-          }`}
-        >
-          {scanning && (
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-          )}
-          {scanning ? 'Scanning...' : scanned ? 'Rescan' : 'Scan for Deposits'}
-        </button>
+        {!scanning && (
+          <button
+            onClick={scanForDeposits}
+            className="text-sm font-medium px-4 py-2 rounded-lg transition-all bg-primary hover:bg-primary-light text-white shadow-button"
+          >
+            Scan for Deposits
+          </button>
+        )}
       </div>
 
-      {/* Optional start block + progress */}
-      {!scanned && !scanning && (
-        <div className="mb-4">
-          <label className="text-xs text-text-muted block mb-1">
-            Start block (optional — speeds up scan if you know when you deposited)
-          </label>
-          <input
-            type="text"
-            value={customStartBlock}
-            onChange={(e) => setCustomStartBlock(e.target.value.replace(/\D/g, ''))}
-            placeholder={`Default: ${getChainConfig(chainId).startBlock.toString()}`}
-            className="w-full max-w-xs px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
-          />
+      {/* Block range inputs */}
+      {!scanning && (
+        <div className="mb-4 flex gap-3">
+          <div className="flex-1">
+            <label className="text-xs text-text-muted block mb-1">
+              Start block (optional)
+            </label>
+            <input
+              type="text"
+              value={customStartBlock}
+              onChange={(e) => setCustomStartBlock(e.target.value.replace(/\D/g, ''))}
+              placeholder={`Default: ${getChainConfig(chainId).startBlock.toString()}`}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-text-muted block mb-1">
+              End block (optional)
+            </label>
+            <input
+              type="text"
+              value={customEndBlock}
+              onChange={(e) => setCustomEndBlock(e.target.value.replace(/\D/g, ''))}
+              placeholder="Default: latest"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+            />
+          </div>
         </div>
       )}
 
