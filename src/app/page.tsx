@@ -1076,7 +1076,10 @@ export default function RecoveryPage() {
 
             {/* Privacy Pools Recovery — wallet flow only (needs signature for PP key derivation) */}
             {recoveryMethod === 'wallet' && signature && !deriving && derivedKeys.length > 0 && (
-              <PrivacyPoolsRecovery signature={signature} chainId={11155111} />
+              <>
+                <PrivacyPoolsRecovery signature={signature} chainId={1} />
+                <PrivacyPoolsRecovery signature={signature} chainId={11155111} />
+              </>
             )}
           </div>
         )}
