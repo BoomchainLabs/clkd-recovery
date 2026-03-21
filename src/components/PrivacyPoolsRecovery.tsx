@@ -102,7 +102,6 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
 
       // Check each index to see if the user deposited at that index.
       // The precommitment is deterministic: same wallet + same scope + same index = same precommitment.
-      // Stop after 20 consecutive misses once we've found at least one deposit.
       const found: PoolDeposit[] = [];
       const scanMaxIndex = Math.min(Math.max(parseInt(maxIndex) || 1000, 1), 10000);
 
