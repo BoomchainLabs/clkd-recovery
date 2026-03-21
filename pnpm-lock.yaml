@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@cloakedxyz/clkd-privacy-pools':
         specifier: git+https://github.com/cloakedxyz/clkd-privacy-pools.git
-        version: git+https://github.com/cloakedxyz/clkd-privacy-pools.git#0e9cd565fe4d422bd6a3385b1f3016b346fd866b(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+        version: git+https://github.com/cloakedxyz/clkd-privacy-pools.git#5144319c4fa80f6d49df72e33824dae625075256(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       '@cloakedxyz/clkd-stealth':
         specifier: 1.0.4
         version: 1.0.4(@types/node@20.19.31)(bufferutil@4.1.0)(utf-8-validate@5.0.10)(zod@3.25.76)
@@ -98,8 +98,8 @@ packages:
   '@base-org/account@2.4.0':
     resolution: {integrity: sha512-A4Umpi8B9/pqR78D1Yoze4xHyQaujioVRqqO3d6xuDFw9VRtjg6tK3bPlwE0aW+nVH/ntllCpPa2PbI8Rnjcug==}
 
-  '@cloakedxyz/clkd-privacy-pools@git+https://github.com/cloakedxyz/clkd-privacy-pools.git#0e9cd565fe4d422bd6a3385b1f3016b346fd866b':
-    resolution: {commit: 0e9cd565fe4d422bd6a3385b1f3016b346fd866b, repo: https://github.com/cloakedxyz/clkd-privacy-pools.git, type: git}
+  '@cloakedxyz/clkd-privacy-pools@git+https://github.com/cloakedxyz/clkd-privacy-pools.git#5144319c4fa80f6d49df72e33824dae625075256':
+    resolution: {commit: 5144319c4fa80f6d49df72e33824dae625075256, repo: https://github.com/cloakedxyz/clkd-privacy-pools.git, type: git}
     version: 0.1.0
 
   '@cloakedxyz/clkd-stealth@1.0.4':
@@ -4118,7 +4118,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@cloakedxyz/clkd-privacy-pools@git+https://github.com/cloakedxyz/clkd-privacy-pools.git#0e9cd565fe4d422bd6a3385b1f3016b346fd866b(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)':
+  '@cloakedxyz/clkd-privacy-pools@git+https://github.com/cloakedxyz/clkd-privacy-pools.git#5144319c4fa80f6d49df72e33824dae625075256(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)':
     dependencies:
       '@0xbow/privacy-pools-core-sdk': 1.2.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)(zod@3.25.76)
       viem: 2.45.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)

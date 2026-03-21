@@ -40,12 +40,14 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
   const [showGuide, setShowGuide] = useState(false);
   const [customStartBlock, setCustomStartBlock] = useState('');
   const [scanProgress, setScanProgress] = useState('');
+  const [scanPercent, setScanPercent] = useState(0);
 
   const scanForDeposits = useCallback(async () => {
     setScanning(true);
     setError(null);
     setDeposits([]);
     setScanProgress('Connecting...');
+    setScanPercent(0);
 
     try {
       const config = getChainConfig(chainId);
@@ -76,7 +78,17 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
         client as any,
         poolConfig.address as `0x${string}`,
         startBlock,
-        currentBlock
+        currentBlock,
+        undefined,
+        (scanned, total) => {
+          if (total > BigInt(0)) {
+            const pct = Number((scanned * BigInt(100)) / total);
+            setScanPercent(pct);
+            setScanProgress(
+              `Scanning blocks... ${pct}% (${Number(scanned).toLocaleString()} / ${Number(total).toLocaleString()})`
+            );
+          }
+        }
       );
 
       setScanProgress('Checking deposit indices...');
@@ -234,13 +246,24 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
         </div>
       )}
 
-      {scanning && scanProgress && (
-        <div className="mb-4 flex items-center gap-2">
-          <svg className="animate-spin h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <p className="text-sm text-text-muted">{scanProgress}</p>
+      {scanning && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-sm text-text-muted mb-2">
+            <span>{scanProgress || 'Starting...'}</span>
+            {scanPercent > 0 && <span>{scanPercent}%</span>}
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-primary h-2 rounded-full transition-all duration-300"
+              style={{ width: `${Math.max(scanPercent, 2)}%` }}
+            />
+          </div>
+          {scanPercent === 0 && (
+            <p className="text-xs text-text-muted mt-2">
+              This may take a few minutes depending on the block range.
+              Enter a start block above to speed things up.
+            </p>
+          )}
         </div>
       )}
 
