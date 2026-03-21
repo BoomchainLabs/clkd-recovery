@@ -132,7 +132,8 @@ export function PrivacyPoolsRecovery({ signature, chainId }: Props) {
             d.precommitment
           );
           d.reviewStatus = status?.reviewStatus ?? 'unknown';
-        } catch {
+        } catch (err) {
+          console.warn(`Failed to check ASP status for deposit ${d.index}:`, err);
           d.reviewStatus = 'unknown';
         }
       }
