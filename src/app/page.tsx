@@ -1085,6 +1085,7 @@ export default function RecoveryPage() {
                       ? 11155111
                       : 1
                   }
+                  stealthKeys={derivedKeys}
                 />
               ) : recoveryMethod === 'backup' && rawKeys ? (
                 <PrivacyPoolsRecovery
@@ -1094,6 +1095,7 @@ export default function RecoveryPage() {
                       ? 11155111
                       : 1
                   }
+                  stealthKeys={derivedKeys}
                 />
               ) : null)}
           </div>
