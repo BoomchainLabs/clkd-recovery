@@ -33,7 +33,7 @@ interface Props {
 
 const CHAIN_MAP = { 1: mainnet, 11155111: sepolia } as const;
 
-const PP_UI_URL = 'https://app.privacypools.com';
+const PP_UI_URL = 'https://privacypools.com';
 
 export function PrivacyPoolsRecovery({ deriveInput, chainId }: Props) {
   const [scanning, setScanning] = useState(false);
