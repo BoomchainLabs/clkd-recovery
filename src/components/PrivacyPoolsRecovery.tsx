@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { createPublicClient, http, formatEther, type Hex } from 'viem';
+import { createPublicClient, http, formatEther, type Hex, parseAbiItem } from 'viem';
 import { sepolia, mainnet } from 'viem/chains';
 import {
   deriveMnemonic,
@@ -20,22 +20,154 @@ interface PoolDeposit {
   index: number;
   precommitment: bigint;
   deposit: DepositRecord;
+  depositor?: string;
+  privateKey?: string;
   reviewStatus: ReviewStatus | 'unknown' | 'scanning';
 }
 
 type DeriveInput = { signature: Hex } | { spendSecret: Hex; viewSecret: Hex };
 
+interface StealthKey {
+  address: string;
+  privateKey: string;
+}
+
 interface Props {
   /** Entropy source — signature (wallet+PIN) or PRF secrets (backup) */
   deriveInput: DeriveInput;
   chainId: 1 | 11155111;
+  /** Derived stealth keys from the recovery section above, used to match depositor addresses */
+  stealthKeys?: StealthKey[];
 }
 
 const CHAIN_MAP = { 1: mainnet, 11155111: sepolia } as const;
 
 const PP_UI_URL = 'https://privacypools.com';
 
-export function PrivacyPoolsRecovery({ deriveInput, chainId }: Props) {
+function CopyButton({
+  label,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      className="text-text-muted hover:text-primary transition-colors flex-shrink-0"
+      title={label}
+    >
+      {copied ? (
+        <svg
+          className="w-4 h-4 text-green-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+function statusBadge(status: ReviewStatus | 'unknown' | 'scanning') {
+  switch (status) {
+    case 'approved':
+      return (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+          Approved
+        </span>
+      );
+    case 'declined':
+      return (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 px-2 py-0.5 rounded-full">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+          Declined
+        </span>
+      );
+    case 'pending':
+      return (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">
+          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+          Pending
+        </span>
+      );
+    case 'scanning':
+      return <span className="text-xs text-text-muted">Checking...</span>;
+    default:
+      return <span className="text-xs text-text-muted">Unknown</span>;
+  }
+}
+
+function DepositRow({ deposit: d }: { deposit: PoolDeposit }) {
+  const [copiedAddr, setCopiedAddr] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
+
+  const handleCopyAddr = () => {
+    if (!d.depositor) return;
+    navigator.clipboard.writeText(d.depositor);
+    setCopiedAddr(true);
+    setTimeout(() => setCopiedAddr(false), 2000);
+  };
+
+  const handleCopyKey = () => {
+    if (!d.privateKey) return;
+    navigator.clipboard.writeText(d.privateKey);
+    setCopiedKey(true);
+    setTimeout(() => setCopiedKey(false), 2000);
+  };
+
+  return (
+    <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+      <td className="px-4 py-3 text-text-muted font-mono">{d.index}</td>
+      <td className="px-4 py-3 font-mono text-text-primary">{formatEther(d.deposit.value)} ETH</td>
+      <td className="px-4 py-3">
+        {d.depositor ? (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-text-primary text-xs">
+              {d.depositor.slice(0, 10)}...{d.depositor.slice(-8)}
+            </span>
+            <CopyButton label="Copy address" copied={copiedAddr} onCopy={handleCopyAddr} />
+          </div>
+        ) : (
+          <span className="text-xs text-text-muted">-</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        {d.privateKey ? (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-text-primary text-xs tracking-wider">
+              ••••••••••••••••••••
+            </span>
+            <CopyButton label="Copy private key" copied={copiedKey} onCopy={handleCopyKey} />
+          </div>
+        ) : d.depositor ? (
+          <span
+            className="text-xs text-yellow-600"
+            title="Try 'Derive More' in the stealth addresses section above"
+          >
+            Not found
+          </span>
+        ) : (
+          <span className="text-xs text-text-muted">-</span>
+        )}
+      </td>
+      <td className="px-4 py-3">{statusBadge(d.reviewStatus)}</td>
+    </tr>
+  );
+}
+
+export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }: Props) {
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [deposits, setDeposits] = useState<PoolDeposit[]>([]);
@@ -123,6 +255,46 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId }: Props) {
         }
       }
 
+      // Match depositors to stealth keys
+      if (found.length > 0 && stealthKeys.length > 0) {
+        setScanProgress('Matching depositors to stealth keys...');
+
+        // Build lookup: lowercase address → privateKey
+        const keysByAddress = new Map<string, string>();
+        for (const k of stealthKeys) {
+          keysByAddress.set(k.address.toLowerCase(), k.privateKey);
+        }
+
+        // Scan Deposited events to find depositor for each found deposit
+        const depositedEvent = parseAbiItem(
+          'event Deposited(address indexed _depositor, uint256 _commitment, uint256 _label, uint256 _value, uint256 _precommitmentHash)'
+        );
+        const foundPrecommitments = new Set(found.map((d) => d.precommitment));
+        const chunkSize = BigInt(1000);
+
+        for (let start = startBlock; start <= endBlock; start += chunkSize) {
+          const end =
+            start + chunkSize - BigInt(1) > endBlock ? endBlock : start + chunkSize - BigInt(1);
+          const logs = await client.getLogs({
+            address: poolConfig.address as `0x${string}`,
+            event: depositedEvent,
+            fromBlock: start,
+            toBlock: end,
+          });
+          for (const log of logs) {
+            const precommitment = log.args._precommitmentHash!;
+            if (foundPrecommitments.has(precommitment)) {
+              const depositor = log.args._depositor!;
+              const match = found.find((d) => d.precommitment === precommitment);
+              if (match) {
+                match.depositor = depositor;
+                match.privateKey = keysByAddress.get(depositor.toLowerCase());
+              }
+            }
+          }
+        }
+      }
+
       // Check ASP status for each deposit
       setScanProgress('Checking ASP status...');
       for (const d of found) {
@@ -142,39 +314,9 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId }: Props) {
     } finally {
       setScanning(false);
     }
-  }, [deriveInput, chainId, customStartBlock, customEndBlock, maxIndex]);
+  }, [deriveInput, chainId, customStartBlock, customEndBlock, maxIndex, stealthKeys]);
 
   const totalValue = deposits.reduce((sum, d) => sum + d.deposit.value, BigInt(0));
-
-  const statusBadge = (status: ReviewStatus | 'unknown' | 'scanning') => {
-    switch (status) {
-      case 'approved':
-        return (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-            Approved
-          </span>
-        );
-      case 'declined':
-        return (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 px-2 py-0.5 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-            Declined
-          </span>
-        );
-      case 'pending':
-        return (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-            Pending
-          </span>
-        );
-      case 'scanning':
-        return <span className="text-xs text-text-muted">Checking...</span>;
-      default:
-        return <span className="text-xs text-text-muted">Unknown</span>;
-    }
-  };
 
   return (
     <div className="mt-8 border-t border-gray-200 pt-6">
@@ -317,35 +459,14 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId }: Props) {
                 <tr className="bg-card-raised border-b border-gray-200">
                   <th className="text-left px-4 py-3 text-text-muted font-medium w-16">#</th>
                   <th className="text-left px-4 py-3 text-text-muted font-medium">Value</th>
+                  <th className="text-left px-4 py-3 text-text-muted font-medium">Depositor</th>
+                  <th className="text-left px-4 py-3 text-text-muted font-medium">Private Key</th>
                   <th className="text-left px-4 py-3 text-text-muted font-medium">Status</th>
-                  <th className="text-left px-4 py-3 text-text-muted font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {deposits.map((d) => (
-                  <tr
-                    key={d.index}
-                    className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-4 py-3 text-text-muted font-mono">{d.index}</td>
-                    <td className="px-4 py-3 font-mono text-text-primary">
-                      {formatEther(d.deposit.value)} ETH
-                    </td>
-                    <td className="px-4 py-3">{statusBadge(d.reviewStatus)}</td>
-                    <td className="px-4 py-3">
-                      {d.reviewStatus === 'approved' && (
-                        <span className="text-xs text-green-600 font-medium">
-                          Ready to withdraw
-                        </span>
-                      )}
-                      {d.reviewStatus === 'declined' && (
-                        <span className="text-xs text-red-600 font-medium">Ragequit available</span>
-                      )}
-                      {d.reviewStatus === 'pending' && (
-                        <span className="text-xs text-text-muted">Awaiting review</span>
-                      )}
-                    </td>
-                  </tr>
+                  <DepositRow key={d.index} deposit={d} />
                 ))}
               </tbody>
             </table>
@@ -395,13 +516,13 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId }: Props) {
             {showGuide && (
               <div className="px-4 pb-4 text-sm text-blue-800 space-y-3">
                 <p>
-                  Privacy Pool deposits are controlled by your wallet&apos;s private key. To
-                  withdraw, you need to use the wallet that made the deposit.
+                  Each Privacy Pool deposit was made from a stealth address. The table above shows
+                  the matched private key for each deposit.
                 </p>
                 <ol className="list-decimal list-inside space-y-2 text-sm">
                   <li>
-                    Find the <strong>stealth address private key</strong> from the table above that
-                    was used to make the deposit.
+                    Click <strong>&quot;Copy private key&quot;</strong> next to the deposit you want
+                    to withdraw.
                   </li>
                   <li>
                     Import that private key into a wallet (MetaMask, Rabby, or Rainbow). See the
@@ -415,12 +536,12 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId }: Props) {
                       rel="noopener noreferrer"
                       className="text-blue-600 underline hover:text-blue-800 font-medium"
                     >
-                      app.privacypools.com
+                      privacypools.com
                     </a>{' '}
                     and connect the wallet with the imported key.
                   </li>
                   <li>
-                    Your deposits will appear in the Privacy Pools UI. From there you can:
+                    Your deposit will appear in the Privacy Pools UI. From there you can:
                     <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
                       <li>
                         <strong>Withdraw</strong> (approved deposits) &mdash; private withdrawal to
@@ -433,13 +554,6 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId }: Props) {
                     </ul>
                   </li>
                 </ol>
-                <div className="bg-blue-100/50 rounded-lg p-3 mt-3">
-                  <p className="text-xs text-blue-700">
-                    <strong>Note:</strong> The Privacy Pools UI uses the same wallet address that
-                    made the deposit. Your deposit secrets are derived from the wallet signature, so
-                    the same wallet will automatically recover them.
-                  </p>
-                </div>
               </div>
             )}
           </div>
