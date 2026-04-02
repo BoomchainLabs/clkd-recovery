@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { createPublicClient, http, fallback, formatEther, type Hex, parseAbiItem } from 'viem';
 import { sepolia, mainnet } from 'viem/chains';
 import {
@@ -50,6 +50,12 @@ const MAINNET_RPCS = [
   'https://ethereum-rpc.publicnode.com',
   'https://rpc.flashbots.net',
   'https://eth.llamarpc.com',
+];
+
+const SEPOLIA_RPCS = [
+  'https://ethereum-sepolia-rpc.publicnode.com',
+  'https://sepolia.drpc.org',
+  'https://rpc2.sepolia.org',
 ];
 
 const PP_UI_URL = 'https://privacypools.com';
@@ -203,6 +209,20 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
   const [scanProgress, setScanProgress] = useState('');
   const [scanPercent, setScanPercent] = useState(0);
 
+  // Derive mnemonic on mount so it's always available
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ppMnemonic = await deriveMnemonic(deriveInput);
+        if (!cancelled) setMnemonic(ppMnemonic);
+      } catch (err) {
+        console.warn('Failed to derive mnemonic:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [deriveInput]);
+
   const scanForDeposits = useCallback(async () => {
     setScanning(true);
     setError(null);
@@ -213,15 +233,15 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
     try {
       const config = getChainConfig(chainId);
       const chain = CHAIN_MAP[chainId];
-      const transport = chainId === 1 ? fallback(MAINNET_RPCS.map((url) => http(url))) : http();
+      const rpcs = chainId === 1 ? MAINNET_RPCS : SEPOLIA_RPCS;
+      const transport = fallback(rpcs.map((url) => http(url)));
       const client = createPublicClient({ chain, transport });
       const poolConfig = config.pools['ETH'];
       if (!poolConfig) throw new Error('No ETH pool configured');
 
-      // Derive PP mnemonic from wallet signature or PRF secrets
+      // Derive PP master keys from wallet signature or PRF secrets
       const ppMnemonic = await deriveMnemonic(deriveInput);
       const masterKeys = deriveMasterKeys(ppMnemonic);
-      setMnemonic(ppMnemonic);
 
       // Read pool scope
       const scope = (await client.readContract({
@@ -373,7 +393,7 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
         // Collect all addresses that have ragequit or withdrawn
         // Stealth addresses are single-use, so any exit event for an address means the deposit is spent
         const exitedAddresses = new Set<string>();
-        const exitChunkSize = BigInt(5000);
+        const exitChunkSize = BigInt(1000);
         for (let start = startBlock; start <= endBlock; start += exitChunkSize) {
           const end =
             start + exitChunkSize - BigInt(1) > endBlock
@@ -545,6 +565,114 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
         </div>
       )}
 
+      {/* Seed phrase — always shown once derived */}
+      {mnemonic && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#D97706"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <p className="text-sm font-semibold text-amber-900">Privacy Pools Seed Phrase</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMnemonicVisible(!mnemonicVisible)}
+                className="text-xs text-amber-700 hover:text-amber-900 transition-colors font-medium"
+              >
+                {mnemonicVisible ? 'Hide' : 'Reveal'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(mnemonic);
+                  setMnemonicCopied(true);
+                  setTimeout(() => setMnemonicCopied(false), 2000);
+                }}
+                className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md bg-amber-200 hover:bg-amber-300 text-amber-900 transition-colors"
+              >
+                {mnemonicCopied ? (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5 text-green-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                    Copy
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="grid grid-cols-6 gap-2 w-full">
+              {mnemonic
+                .split(' ')
+                .slice(0, 6)
+                .map((word, i) => (
+                  <div
+                    key={i}
+                    className="bg-white border border-amber-200 rounded-md px-2 py-1.5 text-center font-mono text-sm"
+                  >
+                    <span className="text-amber-400 text-xs mr-1">{i + 1}</span>
+                    {mnemonicVisible ? word : '\u2022\u2022\u2022\u2022\u2022'}
+                  </div>
+                ))}
+            </div>
+            <div className="grid grid-cols-6 gap-2 w-full">
+              {mnemonic
+                .split(' ')
+                .slice(6, 12)
+                .map((word, i) => (
+                  <div
+                    key={i + 6}
+                    className="bg-white border border-amber-200 rounded-md px-2 py-1.5 text-center font-mono text-sm"
+                  >
+                    <span className="text-amber-400 text-xs mr-1">{i + 7}</span>
+                    {mnemonicVisible ? word : '\u2022\u2022\u2022\u2022\u2022'}
+                  </div>
+                ))}
+            </div>
+          </div>
+          <p className="text-xs text-amber-700 mt-2">
+            This is your Privacy Pools wallet seed phrase. Keep it safe and never share it
+            publicly.
+          </p>
+        </div>
+      )}
+
       {deposits.length > 0 && (
         <>
           {/* Summary */}
@@ -588,114 +716,6 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
               </tbody>
             </table>
           </div>
-
-          {/* Seed phrase export */}
-          {mnemonic && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#D97706"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                  <p className="text-sm font-semibold text-amber-900">Privacy Pools Seed Phrase</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMnemonicVisible(!mnemonicVisible)}
-                    className="text-xs text-amber-700 hover:text-amber-900 transition-colors font-medium"
-                  >
-                    {mnemonicVisible ? 'Hide' : 'Reveal'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(mnemonic);
-                      setMnemonicCopied(true);
-                      setTimeout(() => setMnemonicCopied(false), 2000);
-                    }}
-                    className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md bg-amber-200 hover:bg-amber-300 text-amber-900 transition-colors"
-                  >
-                    {mnemonicCopied ? (
-                      <>
-                        <svg
-                          className="w-3.5 h-3.5 text-green-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                        Copy
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="grid grid-cols-6 gap-2 w-full">
-                  {mnemonic
-                    .split(' ')
-                    .slice(0, 6)
-                    .map((word, i) => (
-                      <div
-                        key={i}
-                        className="bg-white border border-amber-200 rounded-md px-2 py-1.5 text-center font-mono text-sm"
-                      >
-                        <span className="text-amber-400 text-xs mr-1">{i + 1}</span>
-                        {mnemonicVisible ? word : '\u2022\u2022\u2022\u2022\u2022'}
-                      </div>
-                    ))}
-                </div>
-                <div className="grid grid-cols-6 gap-2 w-full">
-                  {mnemonic
-                    .split(' ')
-                    .slice(6, 12)
-                    .map((word, i) => (
-                      <div
-                        key={i + 6}
-                        className="bg-white border border-amber-200 rounded-md px-2 py-1.5 text-center font-mono text-sm"
-                      >
-                        <span className="text-amber-400 text-xs mr-1">{i + 7}</span>
-                        {mnemonicVisible ? word : '\u2022\u2022\u2022\u2022\u2022'}
-                      </div>
-                    ))}
-                </div>
-              </div>
-              <p className="text-xs text-amber-700 mt-2">
-                This is your Privacy Pools wallet seed phrase. Keep it safe and never share it
-                publicly.
-              </p>
-            </div>
-          )}
 
           {/* Recovery instructions */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
