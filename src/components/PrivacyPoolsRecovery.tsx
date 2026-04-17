@@ -56,10 +56,7 @@ interface PoolDeposit {
  * we read decimals() from the asset contract so new pools "just work" without
  * needing a code change here.
  */
-async function resolvePoolDecimals(
-  client: PublicClient,
-  poolConfig: PoolConfig
-): Promise<number> {
+async function resolvePoolDecimals(client: PublicClient, poolConfig: PoolConfig): Promise<number> {
   if (poolConfig.type === 'simple') return 18;
   const decimals = await client.readContract({
     address: poolConfig.assetAddress,
@@ -194,9 +191,7 @@ function DepositRow({ deposit: d }: { deposit: PoolDeposit }) {
         {d.isChange ? (
           <span title={`Change from partial withdrawal of deposit #${d.index}`}>
             {d.index}
-            <span className="text-xs text-primary ml-0.5">
-              .{d.withdrawalIndex}
-            </span>
+            <span className="text-xs text-primary ml-0.5">.{d.withdrawalIndex}</span>
           </span>
         ) : (
           d.index
@@ -220,9 +215,7 @@ function DepositRow({ deposit: d }: { deposit: PoolDeposit }) {
       <td className="px-4 py-3 font-mono text-text-primary">
         {formatUnits(d.deposit.value, d.decimals)} {d.poolSymbol}
         {d.isChange && (
-          <span className="block text-xs text-primary font-sans">
-            Partial remainder
-          </span>
+          <span className="block text-xs text-primary font-sans">Partial remainder</span>
         )}
       </td>
       <td className="px-4 py-3">
@@ -438,7 +431,10 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
           const ragequitEvent = parseAbiItem(
             'event Ragequit(address indexed _ragequitter, uint256 _value, uint256 _spentNullifier, uint256 _newCommitment)'
           );
-          const spentNullifiers = new Map<bigint, WithdrawalRecord & { via: 'withdrawn' | 'recovered' }>();
+          const spentNullifiers = new Map<
+            bigint,
+            WithdrawalRecord & { via: 'withdrawn' | 'recovered' }
+          >();
           const exitChunkSize = BigInt(1000);
           for (let start = startBlock; start <= endBlock; start += exitChunkSize) {
             checkCancel();
@@ -505,9 +501,7 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
             for (let start = startBlock; start <= endBlock; start += chunkSize) {
               checkCancel();
               const end =
-                start + chunkSize - BigInt(1) > endBlock
-                  ? endBlock
-                  : start + chunkSize - BigInt(1);
+                start + chunkSize - BigInt(1) > endBlock ? endBlock : start + chunkSize - BigInt(1);
               const logs = await client.getLogs({
                 address: poolAddress as `0x${string}`,
                 event: depositedEvent,
@@ -550,9 +544,7 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
             );
 
             for (const cc of changeCommitments) {
-              const parent = found.find(
-                (d) => d.index === Number(cc.depositIndex) && !d.isChange
-              );
+              const parent = found.find((d) => d.index === Number(cc.depositIndex) && !d.isChange);
               found.push({
                 poolSymbol,
                 decimals,
@@ -631,7 +623,16 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
       setCancelling(false);
       cancelRef.current = false;
     }
-  }, [deriveInput, chainId, customStartBlock, customEndBlock, maxIndex, stealthKeys, selectedPool, customRpc]);
+  }, [
+    deriveInput,
+    chainId,
+    customStartBlock,
+    customEndBlock,
+    maxIndex,
+    stealthKeys,
+    selectedPool,
+    customRpc,
+  ]);
 
   const cancelScan = useCallback(() => {
     cancelRef.current = true;
@@ -952,10 +953,7 @@ export function PrivacyPoolsRecovery({ deriveInput, chainId, stealthKeys = [] }:
                         recoveredCount > 0 ? `${recoveredCount} recovered` : '',
                       ].filter(Boolean);
                       return (
-                        <span className="text-text-muted font-normal">
-                          {' '}
-                          ({parts.join(', ')})
-                        </span>
+                        <span className="text-text-muted font-normal"> ({parts.join(', ')})</span>
                       );
                     })()}
                 </p>
