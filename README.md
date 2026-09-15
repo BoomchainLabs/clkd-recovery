@@ -45,9 +45,13 @@ All key derivation happens locally in your browser using [`@cloakedxyz/clkd-stea
 
 ## Running locally
 
+Use Node.js 24 to match the deployed application and CI.
+
 ```bash
 git clone https://github.com/cloakedxyz/clkd-recovery.git
 cd clkd-recovery
+nvm install
+nvm use
 pnpm install
 
 cp .env.example .env.local
